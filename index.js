@@ -1,0 +1,75 @@
+const express = require("express");
+const multer = require("multer");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+require("dotenv").config();
+
+const app = express();
+const upload = multer();
+const port = 3000;
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Function to extract JSON from Markdown response
+function extractJsonFromMarkdown(markdown) {
+  try {
+    // Remove markdown code block markers
+    const jsonString = markdown.replace(/```json|```/g, '').trim();
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.error("Error parsing markdown response:", error);
+    throw new Error("Failed to parse model response");
+  }
+}
+
+app.post("/analyze", upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No image uploaded" });
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `Analyze this image of chicken feces and determine its health status:
+      1. Healthy: Brown with white urate cap, firm consistency.
+      2. Coccidiosis: Bloody/reddish, watery.
+      3. Newcastle: Greenish, watery diarrhea.
+      
+      If not chicken feces, respond: "This does not appear to be chicken feces."
+      
+      Respond in JSON format ONLY, with this exact structure:
+      {
+        "isFeces": boolean,
+        "healthStatus": "healthy|coccidiosis|newcastle|unknown",
+        "confidence": "high|medium|low",
+        "description": "string",
+        "recommendation": "string"
+      }`;
+
+    const image = {
+      inlineData: {
+        data: req.file.buffer.toString("base64"),
+        mimeType: req.file.mimetype,
+      },
+    };
+
+    const result = await model.generateContent([prompt, image]);
+    const response = await result.response;
+    const text = response.text();
+    
+    // Parse the markdown response
+    const jsonResponse = extractJsonFromMarkdown(text);
+    res.json(jsonResponse);
+
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({ 
+      error: "Analysis failed", 
+      details: error.message,
+      fullError: error.stack // For debugging
+    });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
+});
