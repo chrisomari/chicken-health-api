@@ -37,6 +37,7 @@ const diseaseRecommendations = {
         {
           name: "Baycox (Toltrazuril) - for severe cases",
           dosage: "Single dose treatment",
+          duration: "One-time administration",
           mechanism: "Effective against all parasite growth stages"
         }
       ],
@@ -61,85 +62,100 @@ const diseaseRecommendations = {
     diagnosis: "Newcastle Disease - Viral Infection",
     description: "Highly contagious paramyxovirus infection with neurological symptoms",
     recommendation: {
-      emergencyActions: [
+      overview: "This deadly viral disease requires immediate containment measures.",
+      treatments: [
         {
-          action: "Vaccination (LaSota strain)",
-          details: "Administer to healthy birds via eye/nose drops for immediate immunity boost"
-        },
-        {
-          action: "Isolation Protocol",
-          details: "Separate sick birds in different building with dedicated equipment"
-        },
-        {
-          action: "Supportive Care",
-          details: "Vitamin supplements in water and maintain warm, stress-free environment"
+          name: "Vaccination (LaSota strain)",
+          dosage: "Administer via eye/nose drops",
+          duration: "Immediate for healthy birds",
+          mechanism: "Boosts immunity against the virus"
         }
+      ],
+      management: [
+        "Isolate sick birds in separate building",
+        "Use dedicated tools/clothes for infected area",
+        "Add vitamin supplements to water"
       ],
       criticalInfo: [
         "80-90% mortality in unvaccinated flocks",
         "Spreads through air, feces, and equipment",
-        "Can devastate entire poultry operations"
+        "Reportable disease in most jurisdictions"
       ],
-      vetRequirements: [
-        "Immediate official diagnosis required by law",
+      vetAdvice: [
+        "Immediate official diagnosis required",
         "Proper containment procedures",
         "Safe disposal of deceased birds"
+      ]
+    }
+  },
+  healthy: {
+    recommendation: {
+      overview: "Normal chicken droppings indicate good health.",
+      maintenance: [
+        "Continue regular feeding schedule",
+        "Provide clean water daily",
+        "Monitor for any changes in droppings"
       ]
     }
   }
 };
 
-// Helper function to format recommendations
+// Format recommendations with clean structure
 function formatRecommendation(recommendation) {
-  let formatted = [];
+  let formatted = "";
   
+  // Overview section
   if (recommendation.overview) {
-    formatted.push(`OVERVIEW:\n${recommendation.overview}\n`);
+    formatted += `OVERVIEW:\n${recommendation.overview}\n\n`;
   }
 
+  // Treatments section
   if (recommendation.treatments) {
-    formatted.push("TREATMENT OPTIONS:");
+    formatted += "TREATMENT OPTIONS:\n";
     recommendation.treatments.forEach(treatment => {
-      formatted.push(`- ${treatment.name}`);
-      formatted.push(`  Dosage: ${treatment.dosage}`);
-      formatted.push(`  Duration: ${treatment.duration}`);
-      formatted.push(`  Mechanism: ${treatment.mechanism}\n`);
+      formatted += `• ${treatment.name}\n`;
+      formatted += `  → Dosage: ${treatment.dosage}\n`;
+      formatted += `  → Duration: ${treatment.duration}\n`;
+      formatted += `  → Action: ${treatment.mechanism}\n\n`;
     });
   }
 
-  if (recommendation.emergencyActions) {
-    formatted.push("EMERGENCY PROTOCOL:");
-    recommendation.emergencyActions.forEach(action => {
-      formatted.push(`- ${action.action}`);
-      formatted.push(`  Details: ${action.details}\n`);
-    });
-  }
-
+  // Management section
   if (recommendation.management) {
-    formatted.push("COOP MANAGEMENT:");
+    formatted += "MANAGEMENT:\n";
     recommendation.management.forEach(item => {
-      formatted.push(`- ${item}`);
+      formatted += `• ${item}\n`;
     });
-    formatted.push("");
+    formatted += "\n";
   }
 
+  // Prevention section
+  if (recommendation.prevention) {
+    formatted += "PREVENTION:\n";
+    recommendation.prevention.forEach(item => {
+      formatted += `• ${item}\n`;
+    });
+    formatted += "\n";
+  }
+
+  // Critical info section
   if (recommendation.criticalInfo) {
-    formatted.push("WHY THIS IS CRITICAL:");
-    recommendation.criticalInfo.forEach(info => {
-      formatted.push(`- ${info}`);
+    formatted += "IMPORTANT NOTES:\n";
+    recommendation.criticalInfo.forEach(item => {
+      formatted += `• ${item}\n`;
     });
-    formatted.push("");
+    formatted += "\n";
   }
 
-  if (recommendation.vetAdvice || recommendation.vetRequirements) {
-    formatted.push("VETERINARY INVOLVEMENT REQUIRED:");
-    const vetItems = recommendation.vetAdvice || recommendation.vetRequirements;
-    vetItems.forEach(item => {
-      formatted.push(`- ${item}`);
+  // Vet advice section
+  if (recommendation.vetAdvice) {
+    formatted += "VETERINARY CARE:\n";
+    recommendation.vetAdvice.forEach(item => {
+      formatted += `• ${item}\n`;
     });
   }
 
-  return formatted;
+  return formatted.trim();
 }
 
 app.post("/analyze", upload.single("image"), async (req, res) => {
@@ -178,13 +194,16 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
     
     const jsonResponse = extractJsonFromMarkdown(text);
     
-    if (jsonResponse.isFeces && jsonResponse.healthStatus in diseaseRecommendations) {
-      const diseaseInfo = diseaseRecommendations[jsonResponse.healthStatus];
-      jsonResponse.diagnosis = diseaseInfo.diagnosis;
-      jsonResponse.description = diseaseInfo.description;
-      jsonResponse.recommendation = formatRecommendation(diseaseInfo.recommendation);
-    } else if (jsonResponse.isFeces) {
-      jsonResponse.recommendation = ["No specific treatment needed. Maintain normal coop hygiene."];
+    // Enhance response with formatted recommendations
+    if (jsonResponse.isFeces) {
+      if (jsonResponse.healthStatus in diseaseRecommendations) {
+        const diseaseInfo = diseaseRecommendations[jsonResponse.healthStatus];
+        jsonResponse.diagnosis = diseaseInfo.diagnosis || "Normal chicken feces";
+        jsonResponse.description = diseaseInfo.description || "Healthy digestive system";
+        jsonResponse.recommendation = formatRecommendation(diseaseInfo.recommendation);
+      } else {
+        jsonResponse.recommendation = formatRecommendation(diseaseRecommendations.healthy.recommendation);
+      }
     }
 
     res.json(jsonResponse);
