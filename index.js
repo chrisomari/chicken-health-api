@@ -115,7 +115,6 @@ const generateRecommendation = (analysis) => {
       };
   }
 };
-
 app.post("/analyze", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
@@ -127,21 +126,28 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
 
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-    const prompt = `Carefully analyze this image following these steps:
-      1. FIRST determine if it contains chicken feces (brown with white urate cap, 1-3cm size)
-      2. ONLY if chicken feces, classify health status:
-         - Healthy: Firm, well-formed with white cap
-         - Coccidiosis: Bloody/watery appearance
-         - Newcastle: Greenish/watery diarrhea
-      3. If clearly NOT chicken feces: healthStatus = "non_feces"
-      4. If uncertain: healthStatus = "unclear"
+    const prompt = `Analyze this image following these EXACT steps:
+      1. FIRST confirm if this is chicken feces by checking for:
+         - Brown color with white urate cap
+         - 1-3 cm in size
+         - Found in chicken environment
+      2. ONLY if confirmed as chicken feces, classify health:
+         - Healthy: Firm, well-formed with distinct white cap
+         - Coccidiosis: Bloody/reddish and watery
+         - Newcastle: Greenish and watery
+      3. If NOT chicken feces, respond with:
+         - isChickenFeces: false
+         - healthStatus: "non_feces"
+      4. If uncertain, respond with:
+         - isChickenFeces: null
+         - healthStatus: "unclear"
 
-      Respond in this exact JSON format:
+      MUST respond with this exact JSON format:
       {
-        "isChickenFeces": boolean, // MUST be true if healthStatus is healthy/coccidiosis/newcastle
+        "isChickenFeces": boolean|null,
         "healthStatus": "healthy|coccidiosis|newcastle|non_feces|unclear",
         "confidence": "high|medium|low",
-        "description": "string describing visual characteristics"
+        "description": "Specific visual features observed"
       }`;
 
     const image = {
@@ -155,14 +161,15 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
     const response = await result.response;
     const text = response.text();
     
-    // Parse and validate the response
-    const analysis = extractJsonFromMarkdown(text);
+    let analysis = extractJsonFromMarkdown(text);
     
-    // Ensure isChickenFeces aligns with healthStatus
+    // Validation layer to fix inconsistencies
     if (['healthy', 'coccidiosis', 'newcastle'].includes(analysis.healthStatus)) {
       analysis.isChickenFeces = true;
-    } else {
+    } else if (analysis.healthStatus === 'non_feces') {
       analysis.isChickenFeces = false;
+    } else {
+      analysis.isChickenFeces = null;
     }
 
     const { diagnosis, description, recommendation } = generateRecommendation(analysis);
@@ -177,17 +184,10 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: "Analysis failed",
-      recommendation: [
-        "Please retry with:",
-        "1. Fresh chicken droppings photo",
-        "2. Plain background",
-        "3. Good lighting",
-        "4. Multiple samples if possible"
-      ].join('\n')
+      recommendation: "Please retry with a clear photo of fresh chicken droppings"
     });
   }
 });
-
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
