@@ -62,7 +62,7 @@ const generateRecommendation = (analysis) => {
     case 'newcastle':
       return {
         diagnosis: "Newcastle Disease - deadly viral infection",
-        description: " possible neck twisting. caused by highly contagious paramyxovirus",
+        description: " diarrhea with possible neck twisting, caused by highly contagious paramyxovirus",
         recommendation: [
           "EMERGENCY ACTIONS:",
           "1. VACCINATION (LaSota strain):",
@@ -83,10 +83,6 @@ const generateRecommendation = (analysis) => {
           "• Spreads through air, feces, and equipment",
           "• Can infect other poultry farms nearby",
           "",
-          "LEGAL REQUIREMENTS:",
-          "• You MUST report suspected cases to livestock authorities",
-          "• Government may quarantine your farm",
-          "",
           "VET URGENTLY NEEDED:",
           "- For official diagnosis and containment procedures",
           "- For proper disposal of dead birds"
@@ -99,20 +95,19 @@ const generateRecommendation = (analysis) => {
         description: "Image doesn't show typical chicken droppings",
         recommendation: [
           "Please submit photos of:",
-          "• Fresh chicken feces (not dried out)",
+          "• Fresh chicken feces",
           "• Taken in the chicken enclosure",
-          "• With size reference (coin/ruler)",
           "• Showing multiple samples if possible"
         ].join('\n')
       };
     
     default:
       return {
-        diagnosis: "Unidentifiable image sample",
-        description: "Cannot confirm this is chicken feces due to image quality or content",
+        diagnosis: "Unidentifiable sample",
+        description: "Unable to confirm if this is chicken feces due to image quality/content",
         recommendation: [
           "For accurate analysis:",
-          "1. Photograph fresh droppings ",
+          "1. Photograph fresh droppings within 1 hour",
           "2. Use plain white background",
           "3. Ensure good lighting without shadows",
           "4. Avoid photographing ground/environment"
@@ -132,20 +127,21 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
 
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-    const prompt = `Analyze this image strictly for chicken feces:
-      1. Healthy: Brown with white urate cap, firm consistency
-      2. Coccidiosis: Bloody/reddish, watery appearance
-      3. Newcastle: Greenish, watery diarrhea
-      
-      If clearly NOT chicken feces: non_feces
-      If uncertain: unclear
+    const prompt = `Carefully analyze this image following these steps:
+      1. FIRST determine if it contains chicken feces (brown with white urate cap, 1-3cm size)
+      2. ONLY if chicken feces, classify health status:
+         - Healthy: Firm, well-formed with white cap
+         - Coccidiosis: Bloody/watery appearance
+         - Newcastle: Greenish/watery diarrhea
+      3. If clearly NOT chicken feces: healthStatus = "non_feces"
+      4. If uncertain: healthStatus = "unclear"
 
       Respond in this exact JSON format:
       {
-        "isChickenFeces": boolean,
+        "isChickenFeces": boolean, // MUST be true if healthStatus is healthy/coccidiosis/newcastle
         "healthStatus": "healthy|coccidiosis|newcastle|non_feces|unclear",
         "confidence": "high|medium|low",
-        "description": "string"
+        "description": "string describing visual characteristics"
       }`;
 
     const image = {
@@ -157,8 +153,18 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
 
     const result = await model.generateContent([prompt, image]);
     const response = await result.response;
-    const analysis = extractJsonFromMarkdown(response.text());
+    const text = response.text();
     
+    // Parse and validate the response
+    const analysis = extractJsonFromMarkdown(text);
+    
+    // Ensure isChickenFeces aligns with healthStatus
+    if (['healthy', 'coccidiosis', 'newcastle'].includes(analysis.healthStatus)) {
+      analysis.isChickenFeces = true;
+    } else {
+      analysis.isChickenFeces = false;
+    }
+
     const { diagnosis, description, recommendation } = generateRecommendation(analysis);
     
     res.json({
