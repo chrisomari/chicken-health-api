@@ -12,7 +12,6 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // Function to extract JSON from Markdown response
 function extractJsonFromMarkdown(markdown) {
   try {
-    // Remove markdown code block markers
     const jsonString = markdown.replace(/```json|```/g, '').trim();
     return JSON.parse(jsonString);
   } catch (error) {
@@ -21,67 +20,127 @@ function extractJsonFromMarkdown(markdown) {
   }
 }
 
-// Enhanced recommendations
+// Well-structured disease recommendations
 const diseaseRecommendations = {
   coccidiosis: {
-    diagnosis: "Coccidiosis - intestinal parasite infection",
-    description: "caused by microscopic parasites (Eimeria) damaging the gut walls",
-    recommendation: [
-      "TREATMENT OPTIONS:",
-      "1. Corid (amprolium) liquid:",
-      "   - Mix 2 teaspoons per gallon of drinking water",
-      "   - Works by starving the parasites of nutrients",
-      "   - Treat for 5-7 days total",
-      "",
-      "2. Baycox (toltrazuril) for severe cases:",
-      "   - Single dose treatment",
-      "   - Stops all parasite growth stages",
-      "",
-      "COOP MANAGEMENT:",
-      "• Remove wet litter DAILY (parasites multiply in moisture)",
-      "• Disinfect with 10% ammonia solution (bleach doesn't work)",
-      "• Provide electrolyte supplements in water",
-      "",
-      "PREVENTION:",
-      "• Keep feeders/drinkers clean and dry",
-      "• Avoid overcrowding (reduces parasite spread)",
-      "• Consider coccidiosis vaccine for new chicks",
-      "",
-      "VET VISIT RECOMMENDED:",
-      "- For fecal testing to confirm parasite type",
-      "- To calculate exact medication doses for your flock size",
-      "- For follow-up treatment plan"
-    ]
+    diagnosis: "Coccidiosis - Intestinal Parasite Infection",
+    description: "Caused by Eimeria parasites damaging intestinal walls",
+    recommendation: {
+      overview: "This parasitic infection requires immediate treatment and coop management to prevent spread.",
+      treatments: [
+        {
+          name: "Corid (Amprolium)",
+          dosage: "2 teaspoons per gallon of drinking water",
+          duration: "5-7 days",
+          mechanism: "Starves parasites of essential nutrients"
+        },
+        {
+          name: "Baycox (Toltrazuril) - for severe cases",
+          dosage: "Single dose treatment",
+          mechanism: "Effective against all parasite growth stages"
+        }
+      ],
+      management: [
+        "Remove wet litter DAILY (parasites thrive in moisture)",
+        "Disinfect with 10% ammonia solution (not bleach)",
+        "Provide electrolyte supplements in water"
+      ],
+      prevention: [
+        "Maintain clean, dry feeders and drinkers",
+        "Avoid overcrowding to reduce transmission",
+        "Consider coccidiosis vaccine for new chicks"
+      ],
+      vetAdvice: [
+        "Fecal testing to confirm parasite type",
+        "Exact medication dosing for your flock size",
+        "Follow-up treatment plan"
+      ]
+    }
   },
   newcastle: {
-    diagnosis: "Newcastle Disease - deadly viral infection",
-    description: "diarrhea with possible neck twisting, caused by highly contagious paramyxovirus",
-    recommendation: [
-      "EMERGENCY ACTIONS:",
-      "1. VACCINATION (LaSota strain):",
-      "   - Administer to healthy birds immediately",
-      "   - Boosts immunity against the virus",
-      "   - Must be given as eye/nose drops for proper protection",
-      "",
-      "2. ISOLATION:",
-      "   - Separate sick birds in different building",
-      "   - Use dedicated tools/clothes for infected area",
-      "",
-      "3. SUPPORTIVE CARE:",
-      "   - Add vitamin supplements to water",
-      "   - Keep birds warm and stress-free",
-      "",
-      "WHY THIS IS CRITICAL:",
-      "• Kills 80-90% of unvaccinated chickens",
-      "• Spreads through air, feces, and equipment",
-      "• Can infect other poultry farms nearby",
-      "",
-      "VET URGENTLY NEEDED:",
-      "- For official diagnosis and containment procedures",
-      "- For proper disposal of dead birds"
-    ]
+    diagnosis: "Newcastle Disease - Viral Infection",
+    description: "Highly contagious paramyxovirus infection with neurological symptoms",
+    recommendation: {
+      emergencyActions: [
+        {
+          action: "Vaccination (LaSota strain)",
+          details: "Administer to healthy birds via eye/nose drops for immediate immunity boost"
+        },
+        {
+          action: "Isolation Protocol",
+          details: "Separate sick birds in different building with dedicated equipment"
+        },
+        {
+          action: "Supportive Care",
+          details: "Vitamin supplements in water and maintain warm, stress-free environment"
+        }
+      ],
+      criticalInfo: [
+        "80-90% mortality in unvaccinated flocks",
+        "Spreads through air, feces, and equipment",
+        "Can devastate entire poultry operations"
+      ],
+      vetRequirements: [
+        "Immediate official diagnosis required by law",
+        "Proper containment procedures",
+        "Safe disposal of deceased birds"
+      ]
+    }
   }
 };
+
+// Helper function to format recommendations
+function formatRecommendation(recommendation) {
+  let formatted = [];
+  
+  if (recommendation.overview) {
+    formatted.push(`OVERVIEW:\n${recommendation.overview}\n`);
+  }
+
+  if (recommendation.treatments) {
+    formatted.push("TREATMENT OPTIONS:");
+    recommendation.treatments.forEach(treatment => {
+      formatted.push(`- ${treatment.name}`);
+      formatted.push(`  Dosage: ${treatment.dosage}`);
+      formatted.push(`  Duration: ${treatment.duration}`);
+      formatted.push(`  Mechanism: ${treatment.mechanism}\n`);
+    });
+  }
+
+  if (recommendation.emergencyActions) {
+    formatted.push("EMERGENCY PROTOCOL:");
+    recommendation.emergencyActions.forEach(action => {
+      formatted.push(`- ${action.action}`);
+      formatted.push(`  Details: ${action.details}\n`);
+    });
+  }
+
+  if (recommendation.management) {
+    formatted.push("COOP MANAGEMENT:");
+    recommendation.management.forEach(item => {
+      formatted.push(`- ${item}`);
+    });
+    formatted.push("");
+  }
+
+  if (recommendation.criticalInfo) {
+    formatted.push("WHY THIS IS CRITICAL:");
+    recommendation.criticalInfo.forEach(info => {
+      formatted.push(`- ${info}`);
+    });
+    formatted.push("");
+  }
+
+  if (recommendation.vetAdvice || recommendation.vetRequirements) {
+    formatted.push("VETERINARY INVOLVEMENT REQUIRED:");
+    const vetItems = recommendation.vetAdvice || recommendation.vetRequirements;
+    vetItems.forEach(item => {
+      formatted.push(`- ${item}`);
+    });
+  }
+
+  return formatted;
+}
 
 app.post("/analyze", upload.single("image"), async (req, res) => {
   try {
@@ -103,8 +162,7 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
         "isFeces": boolean,
         "healthStatus": "healthy|coccidiosis|newcastle|unknown",
         "confidence": "high|medium|low",
-        "description": "string",
-        "recommendation": "string"
+        "description": "string"
       }`;
 
     const image = {
@@ -118,15 +176,15 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
     const response = await result.response;
     const text = response.text();
     
-    // Parse the markdown response
     const jsonResponse = extractJsonFromMarkdown(text);
     
-    // Enhance the response with detailed recommendations if disease is detected
     if (jsonResponse.isFeces && jsonResponse.healthStatus in diseaseRecommendations) {
       const diseaseInfo = diseaseRecommendations[jsonResponse.healthStatus];
       jsonResponse.diagnosis = diseaseInfo.diagnosis;
       jsonResponse.description = diseaseInfo.description;
-      jsonResponse.recommendation = diseaseInfo.recommendation;
+      jsonResponse.recommendation = formatRecommendation(diseaseInfo.recommendation);
+    } else if (jsonResponse.isFeces) {
+      jsonResponse.recommendation = ["No specific treatment needed. Maintain normal coop hygiene."];
     }
 
     res.json(jsonResponse);
@@ -135,8 +193,7 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
     console.error("Error:", error);
     res.status(500).json({ 
       error: "Analysis failed", 
-      details: error.message,
-      fullError: error.stack // For debugging
+      details: error.message
     });
   }
 });
