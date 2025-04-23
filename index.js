@@ -9,43 +9,144 @@ const port = 3000;
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-function extractJsonFromMarkdown(markdown) {
+const extractJsonFromMarkdown = (markdown) => {
   try {
     const jsonString = markdown.replace(/```json|```/g, '').trim();
     return JSON.parse(jsonString);
   } catch (error) {
-    console.error("Error parsing markdown response:", error);
-    throw new Error("Failed to parse model response");
+    throw new Error("Failed to process the analysis");
   }
-}
+};
+
+const generateRecommendation = (analysis) => {
+  switch(analysis.healthStatus) {
+    case 'healthy':
+      return {
+        diagnosis: "Healthy droppings - normal digestion",
+        description: " indicates good health",
+        recommendation: "No treatment needed. Continue regular feeding and cleaning routines."
+      };
+    
+    case 'coccidiosis':
+      return {
+        diagnosis: "Coccidiosis - intestinal parasite infection",
+        description: " caused by microscopic parasites (Eimeria) damaging the gut walls",
+        recommendation: [
+          "TREATMENT OPTIONS:",
+          "1. Corid (amprolium) liquid:",
+          "   - Mix 2 teaspoons per gallon of drinking water",
+          "   - Works by starving the parasites of nutrients",
+          "   - Treat for 5-7 days total",
+          "",
+          "2. Baycox (toltrazuril) for severe cases:",
+          "   - Single dose treatment",
+          "   - Stops all parasite growth stages",
+          "",
+          "COOP MANAGEMENT:",
+          "• Remove wet litter DAILY (parasites multiply in moisture)",
+          "• Disinfect with 10% ammonia solution (bleach doesn't work)",
+          "• Provide electrolyte supplements in water",
+          "",
+          "PREVENTION:",
+          "• Keep feeders/drinkers clean and dry",
+          "• Avoid overcrowding (reduces parasite spread)",
+          "• Consider coccidiosis vaccine for new chicks",
+          "",
+          "VET VISIT RECOMMENDED:",
+          "- For fecal testing to confirm parasite type",
+          "- To calculate exact medication doses for your flock size",
+          "- For follow-up treatment plan"
+        ].join('\n')
+      };
+    
+    case 'newcastle':
+      return {
+        diagnosis: "Newcastle Disease - deadly viral infection",
+        description: " possible neck twisting. caused by highly contagious paramyxovirus",
+        recommendation: [
+          "EMERGENCY ACTIONS:",
+          "1. VACCINATION (LaSota strain):",
+          "   - Administer to healthy birds immediately",
+          "   - Boosts immunity against the virus",
+          "   - Must be given as eye/nose drops for proper protection",
+          "",
+          "2. ISOLATION:",
+          "   - Separate sick birds in different building",
+          "   - Use dedicated tools/clothes for infected area",
+          "",
+          "3. SUPPORTIVE CARE:",
+          "   - Add vitamin supplements to water",
+          "   - Keep birds warm and stress-free",
+          "",
+          "WHY THIS IS CRITICAL:",
+          "• Kills 80-90% of unvaccinated chickens",
+          "• Spreads through air, feces, and equipment",
+          "• Can infect other poultry farms nearby",
+          "",
+          "LEGAL REQUIREMENTS:",
+          "• You MUST report suspected cases to livestock authorities",
+          "• Government may quarantine your farm",
+          "",
+          "VET URGENTLY NEEDED:",
+          "- For official diagnosis and containment procedures",
+          "- For proper disposal of dead birds"
+        ].join('\n')
+      };
+    
+    case 'non_feces':
+      return {
+        diagnosis: "Not chicken feces",
+        description: "Image doesn't show typical chicken droppings",
+        recommendation: [
+          "Please submit photos of:",
+          "• Fresh chicken feces (not dried out)",
+          "• Taken in the chicken enclosure",
+          "• With size reference (coin/ruler)",
+          "• Showing multiple samples if possible"
+        ].join('\n')
+      };
+    
+    default:
+      return {
+        diagnosis: "Unidentifiable image sample",
+        description: "Cannot confirm this is chicken feces due to image quality or content",
+        recommendation: [
+          "For accurate analysis:",
+          "1. Photograph fresh droppings ",
+          "2. Use plain white background",
+          "3. Ensure good lighting without shadows",
+          "4. Avoid photographing ground/environment"
+        ].join('\n')
+      };
+  }
+};
 
 app.post("/analyze", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: "No image uploaded" });
+      return res.status(400).json({
+        error: "No image uploaded",
+        recommendation: "Please take a clear photo of chicken droppings and try again"
+      });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-    const prompt = `Analyze this image of chicken feces and determine its health status:
-      1. Healthy: Brown with white urate cap, firm consistency.
-      2. Coccidiosis: Bloody/reddish, watery.
-      3. Newcastle: Greenish, watery diarrhea.
+    const prompt = `Analyze this image strictly for chicken feces:
+      1. Healthy: Brown with white urate cap, firm consistency
+      2. Coccidiosis: Bloody/reddish, watery appearance
+      3. Newcastle: Greenish, watery diarrhea
+      
+      If clearly NOT chicken feces: non_feces
+      If uncertain: unclear
 
-      If not chicken feces, respond with isFeces: false.
-
-      Respond in JSON format ONLY with this exact structure:
+      Respond in this exact JSON format:
       {
-        "isFeces": boolean,
-        "healthStatus": "healthy|coccidiosis|newcastle|unknown",
+        "isChickenFeces": boolean,
+        "healthStatus": "healthy|coccidiosis|newcastle|non_feces|unclear",
         "confidence": "high|medium|low",
-        "description": "string",
-        "recommendation": "string (MUST conclude with 'Consult a veterinarian for proper diagnosis and treatment.')"
-      }
-
-      IMPORTANT: 
-      - Do not include any additional text or markdown symbols
-      - The recommendation MUST end with vet consultation advice`;
+        "description": "string"
+      }`;
 
     const image = {
       inlineData: {
@@ -56,23 +157,27 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
 
     const result = await model.generateContent([prompt, image]);
     const response = await result.response;
-    const text = response.text();
+    const analysis = extractJsonFromMarkdown(response.text());
     
-    // Directly return Gemini's parsed response
-    const geminiResponse = extractJsonFromMarkdown(text);
+    const { diagnosis, description, recommendation } = generateRecommendation(analysis);
     
-    // Ensure recommendation ends with vet advice (fallback if Gemini forgets)
-    if (geminiResponse.isFeces && !geminiResponse.recommendation.includes("veterinarian")) {
-      geminiResponse.recommendation += " Consult a veterinarian for proper diagnosis and treatment.";
-    }
-
-    res.json(geminiResponse);
+    res.json({
+      ...analysis,
+      diagnosis,
+      description,
+      recommendation
+    });
 
   } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Analysis failed",
-      details: error.message
+      recommendation: [
+        "Please retry with:",
+        "1. Fresh chicken droppings photo",
+        "2. Plain background",
+        "3. Good lighting",
+        "4. Multiple samples if possible"
+      ].join('\n')
     });
   }
 });
