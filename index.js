@@ -168,7 +168,7 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
 
     const prompt = `Analyze this image of chicken feces and determine its health status:
       1. Healthy: Brown with white urate cap, firm consistency.
-      2. Coccidiosis: Yellow-brown, watery feces with mucus, lacking blood; in severe cases, feces turn bloody, tar-like, and may contain intestinal lining.
+      2. Coccidiosis: Bloody/reddish, watery.
       3. Newcastle: Greenish, watery diarrhea.
 
       If not chicken feces, respond: "This does not appear to be chicken feces."
