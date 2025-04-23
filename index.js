@@ -9,10 +9,8 @@ const port = 3000;
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Function to extract JSON from Markdown response
 function extractJsonFromMarkdown(markdown) {
   try {
-    // Remove markdown code block markers
     const jsonString = markdown.replace(/```json|```/g, '').trim();
     return JSON.parse(jsonString);
   } catch (error) {
@@ -33,17 +31,21 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
       1. Healthy: Brown with white urate cap, firm consistency.
       2. Coccidiosis: Bloody/reddish, watery.
       3. Newcastle: Greenish, watery diarrhea.
-      
-      If not chicken feces, respond: "This does not appear to be chicken feces."
-      
-      Respond in JSON format ONLY, with this exact structure:
+
+      If not chicken feces, respond with isFeces: false.
+
+      Respond in JSON format ONLY with this exact structure:
       {
         "isFeces": boolean,
         "healthStatus": "healthy|coccidiosis|newcastle|unknown",
         "confidence": "high|medium|low",
         "description": "string",
-        "recommendation": "string"
-      }`;
+        "recommendation": "string (MUST conclude with 'Consult a veterinarian for proper diagnosis and treatment.')"
+      }
+
+      IMPORTANT: 
+      - Do not include any additional text or markdown symbols
+      - The recommendation MUST end with vet consultation advice`;
 
     const image = {
       inlineData: {
@@ -56,16 +58,21 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
     const response = await result.response;
     const text = response.text();
     
-    // Parse the markdown response
-    const jsonResponse = extractJsonFromMarkdown(text);
-    res.json(jsonResponse);
+    // Directly return Gemini's parsed response
+    const geminiResponse = extractJsonFromMarkdown(text);
+    
+    // Ensure recommendation ends with vet advice (fallback if Gemini forgets)
+    if (geminiResponse.isFeces && !geminiResponse.recommendation.includes("veterinarian")) {
+      geminiResponse.recommendation += " Consult a veterinarian for proper diagnosis and treatment.";
+    }
+
+    res.json(geminiResponse);
 
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({ 
-      error: "Analysis failed", 
-      details: error.message,
-      fullError: error.stack // For debugging
+      error: "Analysis failed",
+      details: error.message
     });
   }
 });
