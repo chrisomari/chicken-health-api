@@ -170,7 +170,6 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
       1. Healthy: Brown with white urate cap, firm consistency.
       2. Coccidiosis: Bloody/reddish, watery.
       3. Newcastle: Greenish, watery diarrhea.
-
       If not chicken feces, respond: "This does not appear to be chicken feces."
 
       Respond in JSON format ONLY, with this exact structure:
@@ -201,6 +200,13 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
         jsonResponse.diagnosis = diseaseInfo.diagnosis || "Normal chicken feces";
         jsonResponse.description = diseaseInfo.description || "Healthy digestive system";
         jsonResponse.recommendation = formatRecommendation(diseaseInfo.recommendation);
+      } else if (jsonResponse.healthStatus === "unknown") {
+        jsonResponse.recommendation = "IMAGE QUALITY TIPS FOR BETTER ANALYSIS:\n" +
+          "• Ensure good lighting conditions - natural daylight is best\n" +
+          "• Avoid taking pictures of dry droppings (fresh samples are easier to analyze)\n" +
+          "• Move camera closer (about 6-12 inches from the sample)\n" +
+          "• Capture from multiple angles if possible\n" +
+          "• Include a reference object (like a coin) for scale";
       } else {
         jsonResponse.recommendation = formatRecommendation(diseaseRecommendations.healthy.recommendation);
       }
